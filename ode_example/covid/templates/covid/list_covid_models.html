@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="container">
+
+        <h3 class="my-3">Covid-19 ODE Models</h3>
+        <hr>
+
+        <table style="width:100%">
+            <tr>
+                <th>Name</th>
+                <th>Created</th>
+                <th>Last Edited</th>
+                <th>Owner</th>
+            </tr>
+
+            {% for ode_model in ode_models %}
+            <tr>
+                <td><a href="{% url 'covid:detail_ode' model.pk %}">{{ ode_model.name }}</a></td>
+                <td>{{ ode_model.created }}</td>
+                <td>{{ ode_model.edited }}</td>
+                <td>{{ ode_model.created_by }}</td>
+            </tr>
+            {% endfor %}
+
+        </table>
+    </div>
+
+{% endblock %}
