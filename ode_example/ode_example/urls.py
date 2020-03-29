@@ -14,14 +14,11 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import include, path, re_path
-from django.conf.urls.static import static
+from django.urls import include, path
 from django.conf import settings
-from django.utils.safestring import mark_safe
-from django.shortcuts import render, get_object_or_404, redirect, reverse
-
+from django.conf.urls.static import static
+from django.contrib.staticfiles import views
 from django.contrib.auth import views as auth_views
-from django.conf.urls import url
 
 urlpatterns = [
 
@@ -38,3 +35,10 @@ urlpatterns = [
 
     # static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += [
+        path('favicon.ico', views.serve, {
+            'path': 'favicon.png',
+        })]

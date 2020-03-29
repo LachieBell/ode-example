@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+	<style type="text/css">
+  		code { white-space: pre; }
+  	</style>
+    <div class="container">
+        {% include "covid/new_ode_modal.html" %}
+
+        <h3 class="my-3">Rationale</h3>
+        <hr>
+
+        <h4>The purpose of this project</h4>
+        <p>
+        	This is a quick demonstration of some principles of Django (and js/jquery/ajax/bootstrap). It features a couple of different design patterns that I have used in my past work. However, through out this project, there were a couple of shortcuts that I took, mostly for the sake of reducing complexity, but I've tried to comment where I can when it is not best practice. e.g. very few of the views have
+        	logic checking the request method, when normally I would do that. Also, error checking in general is pretty limited, because I didn't want to clutter my code or spend too much time doing so. The examples here are a little contrived and just the tip of the ice berg of what I'm capable of.
+        </p>
+
+        <h4>What does this project actually do?</h4>
+        <p>
+        	In short it solves a very simple <a href="https://en.wikipedia.org/wiki/Ordinary_differential_equation">ODE</a> which is modelling a viral infection within a population. I have taken heavy inspiration from a numberphile video doing a similar thing.
+        </p>
+        	<iframe style="display:block;align:middle;margin: 0 auto;" width="560" height="315" src="https://www.youtube.com/embed/k6nLfCbAzgo" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <p>
+        	The ODE boils down to three equations.</br>
+
+		<code>
+	s'= - tr * s * i
+	i' = tr * s * i - rr * i
+	r' = rr * i
+		</code></br>
+		where <code>tr</code> is transmission rate (a proxy to a social distancing factor) and <code>rr</code> is recovery rate (how quickly infected people become not contagious). My ODE model saves the rate parameters, as well as the start conditions and the number of timesteps to perform. These can edited from an ODE detail page or from the Admin console.
+        </p>
+        
+        {% if ode_model %}
+        	<img src='{{ ode_model.image.url }}' title="Most recent saved simulation (excuse the fonts, I didn't have time to fix it)">
+        {% else %}
+        	<p class=text-muted>Normally the latest image generated will display here. Looks like no models have saved images. After making an ODE, click the "save SVG" button on the bottom. <a href="{% url 'covid:list_covid_models' %}" target='_blank'>Click here</a> to go to the list ODE models to build a new one.</p>
+        {% endif %}
+
+        <p>
+        	It is not the most intuitive interface, but from the detail page you can choose to "save the parameters" which is essentially doing an update to the database. You can "Simulate in Django" which will basically treat the parameters as a JSON object and use "solve ODE" api. The "Simulate in JavaScript" runs it client side. By default, the "autorender" ticky box if ticked, so any changed to the input parameters will lead to it being simulated (in js). When clicking any of the simulations, it is <strong>NOT</strong> updating the database.
+    	</p>
+
+    	<p>
+    		Finally there is a top level (same level as manage.py) script that can be ran to proove that the ODE can function as an independent API (obviously make sure the server is running while running it). 
+    	</p>
+        
+    </div>
+
+{% endblock %}
+
+
+{% block postscripts %}
+
+{% endblock %}

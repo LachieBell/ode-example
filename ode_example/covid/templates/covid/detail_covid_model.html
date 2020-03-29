@@ -5,22 +5,35 @@
     <div class="container">
 
         <h3 class="my-3">{{ ode_model.name }}</h3>
+        <div class="row">
+            <div class="col">
+                <div class="text-right">
+                    <a type="button" class="btn btn-danger" href="{% url 'covid:delete_ode' ode_model.pk %}">Delete Model</a>
+                </div>
+            </div>
+        </div>
         <hr>
 
         {% include 'covid/ode_parameter_form.html' %}
 
+
         <hr>
 
         <div class="row justify-content-between" >
-            <a class="btn btn-outline-primary" href='#'>Save parameters</a>
-            <a class="btn btn-success" href='#' title="Watch stdout for debugging">Simulate in Django</a>
-            <a class="btn btn-success" href='#' title="Watch browser console for debugging">Simulate in JavaScript</a>
+            <div class="form-group form-check">
+                <input type="checkbox" checked=true class="form-check-input" id="auto-render">
+                <label class="form-check-label">Render on change</label>
+            </div>
+
+            <button id="save-btn" class="btn btn-primary disabled">Save parameters</button>
+            <button id="django-btn" class="btn btn-success" title="Watch stdout for debugging">Simulate in Django</button>
+            <button id="js-btn" class="btn btn-success" title="Watch browser console for debugging">Simulate in JavaScript</button>
         </div>
-
-
-
         <div class="row">
             <div class="col text-center my-2" id="svg-container"></div>
+        </div>
+        <div class="row">
+            <button id="save-svg-btn" href="{% url 'covid:save_ode_image' ode_model.pk %}" class="btn btn-primary disabled" title="Gets used to in rendering of rationale">Save SVG</button>
         </div>
 
     </div>
@@ -31,117 +44,235 @@
 
 {% block postscripts %}
 
-<style type="text/css">
-/* 13. Basic Styling with CSS */
-
-/* Style the lines by removing the fill and applying a stroke */
-    .line {
-        fill: none;
-        stroke-width: 3;
-    }
-      
-    .overlay {
-      fill: none;
-      pointer-events: all;
-    }
-
-    /* Style the dots by assigning a fill and stroke */
-    .dot {
-        stroke: #fff;
-    }
-      
-      .focus circle {
-      fill: none;
-      stroke: steelblue;
-    }
-
-</style>
-
 
 <script>
 
 
-    let distance_ladies = function(){
-        let d = $('#id_transmission_rate').attr('value');
-        $('.socially-distant').css('margin-right', d + '%');
+    let solve_ode_in_js = function(){
+
+        let inputs = $('#ode-parameter-form :input');
+        let parameters = {};
+        inputs.each(function() {
+            parameters[this.name] = $(this).val();
+        });
+
+
+        let tr = parameters.transmission_rate;
+        let rr = parameters.recovery_rate;
+
+        let i = parameters.initial_percent_infected / 100;
+        let r = 0;
+        let s = 1 - i - r;
+
+        let susceptible_data = [s];
+        let infected_data = [i];
+        let recovered_data = [r];
+
+        for(t=0; t<parameters.max_t; t++){
+            let s_prime = - tr * s * i
+            let i_prime = tr * s * i - rr * i
+            let r_prime = rr * i
+
+            s += s_prime
+            i += i_prime
+            r += r_prime
+
+            s = Math.min(Math.max(s, 0), 1)
+            i = Math.min(Math.max(i, 0), 1)
+            r = Math.min(Math.max(r, 0), 1)
+
+            susceptible_data.push(s)
+            infected_data.push(i)
+            recovered_data.push(r)
+
+        }
+
+        let data = {
+            "recovered": recovered_data,
+            "infected": infected_data,
+            "susceptible": susceptible_data,
+            "peak_infected": Math.round(100*Math.max(...infected_data)),
+            "total_recovered": Math.round(100*recovered_data[infected_data.length-1])
+        };
+
+
+        $('#data-div').attr('data-solution', JSON.stringify(data));
+        draw_data();
 
     };
 
-    let bind_sliders_to_displays = function(){
+
+    let enabled_save_btn = function(){
+
+        if($("#save-btn").hasClass("disabled")){
+            bind_save_btn();
+            $("#save-btn").removeClass("disabled");
+        }
+    };
+
+
+    let distance_ladies = function(){
+        let d = $('#id_transmission_rate').attr('value');
+        $('.socially-distant').css('margin-right', (10-d) + '%');
+
+    };
+
+    let bind_input_to_displays = function(){
 
 
         $('#id_transmission_rate').on('input', function () {
-            $(this).trigger('change');
-        });
-
-        $('#id_transmission_rate').change(function(e) {
-              $(this).attr('value', this.value); //JS is weird sometimes.
-              $('#trans-display').html(this.value);
+            $(this).attr('value', this.value); //JS is weird sometimes.
               distance_ladies();
-            });
+        });
 
 
         $('#id_recovery_rate').on('input', function () {
-            $(this).trigger('change');
-        });
-
-
-        $('#id_recovery_rate').change(function(e) {
-            $(this).attr('value', this.value); //JS is weird sometimes.
-            $('#recv-display').html(this.value);
-
             let s = '🏥';
-            for(let i=0; i<this.value; i++){
+            for(let i=0; i<this.value*10; i++){
                 s += '🏥'
             }
 
             $('#recovery-centres').html(s);
             });
+
+
+        $( "#ode-parameter-form input" ).on('input', function() {
+            enabled_save_btn();
+            if($('#auto-render').prop("checked")){
+                solve_ode_in_js();
+            }
+        });
     };
 
 
+    let submit_save_form = function(){
+        let form = $("#ode-parameter-form");
+        let url = form.attr('action');
 
-    let draw_data = function(max_t){
+        $.ajax({
+               type: "POST",
+               url: url,
+               data: form.serialize(), // serializes the form's elements.
+               success: function(resp)
+               {
+                $("#save-btn").addClass("disabled");
+                    $('#data-div').attr('data-solution', JSON.stringify(resp));
+                    draw_data();
+                }
+               }
+             );
+    };
 
-        let recovery_color = '#ff0000';
-        let infected_color = '#3CB371';
-        let susceptible_color = '#ffab00';
+
+    let bind_save_btn = function(){
+        $("#save-btn").unbind().click( function(event) {
+            event.preventDefault();
+            submit_save_form();
+            });
+    };
 
 
-        const data_div = document.querySelector("#data-div");
-        const data = JSON.parse(data_div.dataset.solution);
-        const target_element = d3.select('#svg-container');
+    let bind_simulate_js_btn = function(){
+        $("#js-btn").unbind().click( function(event) {
+            event.preventDefault();
+            console.log("Running simulation on frontend")
+            solve_ode_in_js();
+            console.log("Simulation finished and rendered")
+            });
+    };
+
+
+    let bind_simulate_django_btn = function(){
+        $("#django-btn").unbind().click( function(event) {
+
+            console.log("Running simulation on backend")
+            //This is basically trying to showcase using this as an external API. 
+            // This is similar to standalone script showcasing the API.
+
+            let form = $("#ode-parameter-form");
+            
+            // Hardcoded url, to better simulate a more external 
+            // site calling this.
+            let url = 'http://{{request.META.HTTP_HOST}}/solve_ode/'
+
+
+            // This is a little bit of hack to make it look a little
+            // bit more like a regular JSON object that would actually
+            // use in an external API.
+            let inputs = $('#ode-parameter-form :input');
+            let parameters = {};
+            inputs.each(function() {
+                parameters[this.name] = $(this).val();
+            });
+            // Using the csrf token in the header to make the browser not complain.
+            // If I was doing this for real (and using this only in a browser), I would
+            // Have an entire django/forms workflow, but for the purposes of demonstration
+            // I'm doing this.
+            let csrf_token = parameters.csrfmiddlewaretoken
+            delete parameters.csrfmiddlewaretoken;
+            delete parameters.name;
+
+            // Sending the AJAX request.
+            $.ajax({
+                type: "GET",
+                url: url,
+                contentType: 'application/json; charset=utf-8',
+                processData: true,
+                headers: {
+                    "X-CSRFToken": csrf_token 
+                },
+                data: parameters,
+                // data: JSON.stringify(parameters),
+                success: function(resp){
+                    $('#data-div').attr('data-solution', JSON.stringify(resp));
+                    draw_data();
+                    console.log("Simulation finished and rendered")
+                    }
+            });
+        });
+    };
+
+    let draw_data = function(){
+
+
+        // colors = [recover color, infected color, susceptible color]
+        let colors = ['#ff0000', '#3CB371', '#ffab00']
+
+        let data_div = document.querySelector("#data-div");
+        let data = JSON.parse(data_div.dataset.solution);
+        let target_element = d3.select('#svg-container');
 
 
         //Clear the html
         target_element.html("");        
 
-        var margin = {top: 50, right: 200, bottom: 50, left: 50}
+        let margin = {top: 50, right: 200, bottom: 50, left: 50}
           , width = 1200 - margin.left - margin.right
           , height = 500 - margin.top - margin.bottom;
 
-        var n = data['recovered'].length - 1;
+        let n = data['recovered'].length - 1;
 
 
-        var xScale = d3.scaleLinear()
-            .domain([0, max_t])
+        let xScale = d3.scaleLinear()
+            .domain([0, n])
             .range([0, width]); 
 
         let maximum = 1;
 
-        var yScale = d3.scaleLinear()
+        let yScale = d3.scaleLinear()
             .domain([0, maximum]) 
             .range([height, 0]); 
 
-        var line = d3.line()
-            .x(function(d, i) { return xScale(i*(max_t/n)); })
+        let line = d3.line()
+            .x(function(d, i) { return xScale(i); })
             .y(function(d) { return yScale(d); })
             .curve(d3.curveMonotoneX) 
 
 
-        var svg = target_element.append("svg")
+        let svg = target_element.append("svg")
             .attr("width", width + margin.left + margin.right)
             .attr("height", height + margin.top + margin.bottom)
+            .attr('xmlns', "http://www.w3.org/2000/svg")
           .append("g")
             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
@@ -156,40 +287,101 @@
             .call(d3.axisLeft(yScale)); 
 
 
-
-
-
         svg.append("path")
             .datum(data['recovered'])
             .attr("class", "line") 
             .attr("d", line) 
-            .attr("stroke", recovery_color);
+            .attr("stroke", colors[0])
+            .attr("stroke-width", 3)
+            .attr("fill", 'none');
 
         
         svg.append("path")
             .datum(data['infected'])
             .attr("class", "line") 
             .attr("d", line) 
-            .attr("stroke", infected_color);
+            .attr("stroke", colors[1])
+            .attr("stroke-width", 3)
+            .attr("fill", 'none');
 
         
         svg.append("path")
             .datum(data['susceptible'])
             .attr("class", "line") 
             .attr("d", line) 
-            .attr("stroke", susceptible_color);
-    }
+            .attr("stroke", colors[2])
+            .attr("stroke-width", 3)
+            .attr("fill", 'none');
+
+
+        let legend_keys = ["Recovered", "Infected", "Susceptible"];
+        
+
+        let line_legend = svg.selectAll(".lineLegend").data(legend_keys)
+            .enter().append("g")
+            .attr("class","lineLegend")
+            .attr("transform", function (d,i) {
+                    return "translate(" + (width-200) + "," + (100+i*20)+")";
+                });
+
+        line_legend.append("text").text(function (d) {return d;})
+            .attr("transform", "translate(15,9)"); //align texts with boxes
+
+        line_legend.append("rect")
+            .attr("fill", function (d, i) {return colors[i]; })
+            .attr("width", 10).attr("height", 10);
+
+        svg.append("text")
+            .text("Peak Infected: "+ data['peak_infected'] +"%")
+            .attr("transform", "translate("+(width-400)+",120)");
+            svg.append("text")
+            .text("Total Recovered: "+ data['total_recovered'] +"%")
+            .attr("transform", "translate("+(width-400)+",140)");
+
+
+        
+
+    };
+
+    let bind_save_svg = function(){
+        $("#save-svg-btn").unbind().click( function(event) {
+            // Saves the svg image to the model object.
+
+            event.preventDefault();
+            let url = $(this).attr('href');
+
+            // Getting the csrf token, again, by no means the right
+            // way of doing this, but I'm trying to get it out the door.
+            let inputs = $('#ode-parameter-form :input');
+            let csrf_token = inputs[0].value;
+            let svg_container = $('#svg-container')
+
+            $.ajax({
+                type: "POST",
+                url: url,
+                data: {html: svg_container.html()}, // serializes the form's elements.
+                headers: {
+                    "X-CSRFToken": csrf_token 
+                },
+                success: function(resp){
+
+                    alert("This SVG will now be used in the rationale")
+                }
+            });
+        });
+    };
 
 
     $(document).ready(function() { 
 
-                bind_sliders_to_displays();
+        bind_input_to_displays();
+        distance_ladies();
+        bind_simulate_js_btn();
+        bind_simulate_django_btn();
+        bind_save_svg();
+        draw_data();
 
-                distance_ladies();
-
-                draw_data(70);
-
-            });
+    });
 
 </script>
 

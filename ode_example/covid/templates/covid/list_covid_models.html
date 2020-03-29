@@ -1,9 +1,18 @@
 {% extends "base.html" %}
-
+{% load tz %}
 {% block content %}
     <div class="container">
+        {% include "covid/new_ode_modal.html" %}
 
-        <h3 class="my-3">Covid-19 ODE Models</h3>
+        <h3 class="my-3">Covid-19 ODE Models </h3>
+        <div class="row">
+            <div class="col">
+                <div class="text-right">
+                    <button type="button" class="btn btn-success" onclick="$('#new-ode-modal').modal();">Add New Model</button>
+                </div>
+            </div>
+        </div>
+
         <hr>
 
         <table style="width:100%">
@@ -13,17 +22,21 @@
                 <th>Last Edited</th>
                 <th>Owner</th>
             </tr>
-
             {% for ode_model in ode_models %}
             <tr>
-                <td><a href="{% url 'covid:detail_ode' model.pk %}">{{ ode_model.name }}</a></td>
-                <td>{{ ode_model.created }}</td>
-                <td>{{ ode_model.edited }}</td>
+                <td><a href="{% url 'covid:detail_ode' ode_model.pk %}">{{ ode_model.name }}</a></td>
+                <td>{{ ode_model.created|timezone:"America/New_York" }}</td>
+                <td>{{ ode_model.edited|timezone:"America/New_York" }}</td>
                 <td>{{ ode_model.created_by }}</td>
             </tr>
             {% endfor %}
 
         </table>
     </div>
+
+{% endblock %}
+
+
+{% block postscripts %}
 
 {% endblock %}

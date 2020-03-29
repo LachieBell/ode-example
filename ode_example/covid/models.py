@@ -66,11 +66,11 @@ class Ode(models.Model):
         validators=[MinValueValidator(0), MaxValueValidator(100)], default=1)
 
     # Where 100 is 100%
-    initial_percent_infected = models.IntegerField(
+    initial_percent_infected = models.FloatField(
         validators=[MinValueValidator(0), MaxValueValidator(100)], default=1
     )
 
-    max_t = models.FloatField(
+    max_t = models.IntegerField(
         validators=[MinValueValidator(0)], default=10
     )
 
@@ -78,6 +78,45 @@ class Ode(models.Model):
     # Saved graphic
     # ================================
     image = models.FileField(null=True, blank=True, upload_to='images/')
+
+    def solve_ode(self):
+        tr = self.transmission_rate
+        rr = self.recovery_rate
+
+        total = 100
+        i = self.initial_percent_infected / 100
+        r = 0
+        s = total / 100 - i - r  # Everyone else.
+
+        susceptible_data = [s]
+        infected_data = [i]
+        recovered_data = [r]
+
+        for _ in range(int(self.max_t)):
+            s_prime = - tr * s * i
+            i_prime = tr * s * i - rr * i
+            r_prime = rr * i
+
+            s += s_prime
+            i += i_prime
+            r += r_prime
+
+            s = min(max(s, 0), 1)
+            i = min(max(i, 0), 1)
+            r = min(max(r, 0), 1)
+
+            susceptible_data.append(s)
+            infected_data.append(i)
+            recovered_data.append(r)
+
+        return {
+            'recovered': recovered_data,
+            'infected': infected_data,
+            'susceptible': susceptible_data,
+            'peak_infected': round(100*max(infected_data)),
+            'total_recovered': round(100*recovered_data[-1])
+
+        }
 
     def __str__(self):
         return str(self.name)
