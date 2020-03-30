@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+"""
+A simple script to call the ODE solver API.
+
+Then for the hell of it, plot it out using turtles. Because why not?
+
+"""
+
 import requests
 import turtle
 
