@@ -82,5 +82,6 @@ def main():
     turtle_print_results(results)
     print(f'Maximum peak was {results["peak_infected"]}\nNumber infected was {results["total_recovered"]}')
 
+
 if __name__ == '__main__':
     main()
