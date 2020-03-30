@@ -1,12 +1,14 @@
-from django.shortcuts import render, get_object_or_404, redirect, reverse
-from django.contrib.auth.decorators import permission_required, login_required
-from django.contrib.auth import authenticate, login
-from django.http import JsonResponse
-from .models import Ode
-from .forms import OdeForm, SimpleOdeForm
 import json
+
+from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.db.models import Q
+from django.http import JsonResponse
+from django.shortcuts import render, get_object_or_404, redirect
+
+from .forms import OdeForm, SimpleOdeForm
+from .models import Ode
+
 
 def _try_to_float(v):
     try:
@@ -16,7 +18,14 @@ def _try_to_float(v):
 
 
 def rationale(request):
+    """Used for the landing page this presents the core concept of the site.
 
+    In the template rendering, it wants to provide an example of a saved image.
+    In order for us to get that, we try and get the most recently edited ode,
+    that has an image. This isn't exactly full proof, but this is pretty
+    contrived to begin with. If no model exists that fits the criteria, then
+    some place holder text is used.
+    """
     ode_models = Ode.objects.exclude(Q(image=None)|Q(image='')).order_by('-edited')
     ode_model = ode_models.first()
     context = {'ode_model': ode_model}
@@ -25,8 +34,7 @@ def rationale(request):
 
 @login_required
 def list_covid_models(request):
-    """Doubles as the home page. This page lists out ODE models and allows
-    you to create new ones"""
+    """This page lists out ODE models and allows you to create new ones"""
     user = request.user
     ode_models = Ode.objects.accessible(user)
     form = SimpleOdeForm()
@@ -40,7 +48,11 @@ def list_covid_models(request):
 
 @login_required
 def save_ode(request, ode_pk):
-    """Updates an ode based on the form from the detail page"""
+    """Updates an ode based on the form from the detail page
+
+    In a practical setting, this should probably be called "update_ode" and use
+    a update_or_create logic.
+    """
 
     if request.method == 'POST':
         accessible_ode_models = Ode.objects.accessible(request.user)
@@ -76,9 +88,11 @@ def new_ode(request):
 
 
 def solve_ode_ajax(request):
-    """A VERY simplistic API endpoint
+    """A VERY simplistic API endpoint. This bad boy runs a simulation with the
+    given parameters. If any of the parameters are missing, than it will use
+    the default parameters for the ODE model.
 
-    data = {
+    params = {
         "transmission_rate": 0.6,
         "recovery_rate": 0.1,
         "initial_percent_infected": 0.1,
@@ -86,6 +100,13 @@ def solve_ode_ajax(request):
         }
 
     Note, we do not touch the database in this call. It is a very "pubic" api.
+    >>> import requests
+    >>> url = 'http://localhost:8000/solve_ode/'
+    >>> data = {'transmission_rate': transmission_rate,
+    >>>        'recovery_rate': recovery_rate,
+    >>>        'initial_percent_infected': initial_percent_infected,
+    >>>        'max_t': max_t}
+    >>> requests.get(url, params=data).json()
     """
     try:
         data = {k: _try_to_float(v) for k, v in request.GET.items()}
@@ -101,7 +122,7 @@ def detail_ode(request, ode_pk):
     """Shows the a detailed page of the ODE. This is also the main interface
     for editing the parameters
 
-    On every request, it solves the ODE and puts puts it in the DOM.
+    On every request, it solves the ODE and puts puts it in a data div.
     """
 
     ode_model = get_object_or_404(Ode, pk=ode_pk)
@@ -120,7 +141,9 @@ def detail_ode(request, ode_pk):
 
 @login_required
 def delete_ode(request, ode_pk):
-
+    """Normally in a production setting, straight up deleting models like this
+    is frowned upon. It is always safest practice to "deactivate" the model.
+    """
     accessible_ode_models = Ode.objects.accessible(request.user)
     ode_model = get_object_or_404(accessible_ode_models, pk=ode_pk)
     ode_model.delete()
@@ -129,13 +152,16 @@ def delete_ode(request, ode_pk):
 
 @login_required
 def save_ode_image(request, ode_pk):
+    """Saves the svg file from the dom to the file system. This allows for the
+    svgs to render in the rationale page. This is mostly an exercise in making
+    a little more interesting endpoint"""
 
     if request.method == "POST":
         accessible_ode_models = Ode.objects.accessible(request.user)
         ode_model = get_object_or_404(accessible_ode_models, pk=ode_pk)
         raw_html = request.POST['html']
 
-        # Keeping people's drives clean
+        # Keeping people's drives clean because I'm polite.
         if ode_model.image.name:
             ode_model.image.delete()
 

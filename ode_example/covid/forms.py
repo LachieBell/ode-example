@@ -3,6 +3,8 @@ from .models import Ode
 
 
 class SimpleOdeForm(forms.ModelForm):
+    """A simple form for Ode that only takes in the name of the model. All other
+    attributes just use the default options"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -18,6 +20,7 @@ class SimpleOdeForm(forms.ModelForm):
 
 
 class OdeForm(forms.ModelForm):
+    """A form for Ode that contains all parameters"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -1,12 +1,6 @@
-from django.db import models
-
-from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.auth.models import User
-
-# from django.core.exceptions import SuspiciousOperation
-# from user_registration.models import Company
-# from meta_model.models import AbstractUserStorage, AbstractDateStorage
-from django.core.exceptions import SuspiciousOperation
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
 
 
 class OdeQuerySet(models.QuerySet):
@@ -14,6 +8,9 @@ class OdeQuerySet(models.QuerySet):
         return self.filter(active=True)
 
     def accessible(self, user):
+        """People can only access the models that they created unless they are
+        staff"""
+
         if user.is_staff:
             return self.all()
         else:
@@ -80,6 +77,12 @@ class Ode(models.Model):
     image = models.FileField(null=True, blank=True, upload_to='images/')
 
     def solve_ode(self):
+        """Solving the ODE based on the parameters of the ODE.
+
+        returns a dictionary of lists, plus the peak infected and total
+        recovered.
+        """
+
         tr = self.transmission_rate
         rr = self.recovery_rate
 
